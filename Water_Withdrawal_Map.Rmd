@@ -1,0 +1,166 @@
+---
+title: "US Water WIthdrawal Map"
+author: "Andre Dextre"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+### Step 1: Load Libraries
+```{r, warning = FALSE, error = FALSE, echo = TRUE, message = FALSE}
+#libraries
+library(readxl)
+library(here)
+library(janitor)
+library(tidyverse)
+library(USAboundaries)
+library(sf)
+library(leaflet)
+```
+
+### Step 2: Organize data: Irrigation Withdrawals + Irrigated Acres
+
+```{r, warning = FALSE, error = FALSE}
+
+conus <- us_states() %>%
+  filter(!state_abbr %in% c("PR", "VI", "DC")) %>% 
+  select(state_name,state_abbr) %>% 
+  rename("state" = state_abbr) 
+
+irrigation <- read_xlsx(here("data/us2015.xlsx"), skip =1) %>% 
+  clean_names() %>% 
+  select(state, ir_wgw_fr, ir_wsw_fr) %>% 
+  mutate("Irrigation" = ir_wgw_fr + ir_wsw_fr) %>% 
+  select(state, Irrigation) %>% 
+  group_by(state) %>% 
+  summarise(across(1, sum)) %>% 
+  filter(!(state %in% c("PR", "VI", "DC"))) %>% 
+  inner_join(conus, by = "state") %>% 
+  st_as_sf()
+
+
+acres <- read_xlsx(here("data/us2015.xlsx"), skip =1) %>% 
+  clean_names() %>% 
+  select(state, ir_ir_spr, ir_ir_mic, ir_ir_sur, ir_ir_tot) %>% 
+  group_by(state) %>% 
+  summarise(across(1:4, sum)) %>% 
+  filter(!(state %in% c("PR", "VI", "DC"))) %>% 
+  inner_join(conus,by = "state") %>%
+  st_as_sf() %>% 
+  st_centroid()
+
+
+
+
+
+```
+
+```{r, warning = FALSE, error = FALSE}
+
+# map data values to colors according to a palette
+# palette for irrigation withdrawals
+pal_w <- colorNumeric(palette = "Blues", reverse= FALSE, domain = irrigation$Irrigation)
+
+# palette for total acres irrigated
+pal_a <- colorNumeric(palette = "Greens", reverse= TRUE, domain = acres$ir_ir_tot)
+
+#3.3
+leaflet() %>%
+  
+  # Add terrain map option
+  addProviderTiles("Esri.WorldImagery", group = "Imagery") %>%
+  
+  # Add base map option
+  addProviderTiles(providers$OpenStreetMap, group = "Base") %>%
+  
+  # Set view of initial map so it is zoomed into continental usa
+  setView(-95,40,3.5) %>%
+  
+  # Add water use data for polygons, set color based on pal defined above
+  addPolygons(data = irrigation,
+              fillColor = ~pal_w(irrigation$Irrigation),
+              
+              # Adjust the opacity—something opaque enough to see the colors but also allow us to see the land use from
+              #the satellite map
+              
+              fillOpacity = 0.9,
+              # Adjust the line weight and color of polygon outlines
+              weight = 2,
+              color = "black",
+              # Indicate the group, which will be important for setting the interactive menu
+              group = "Irrigation Withdrawals") %>%
+  # Add acres data for circles, set color based on pal defined above, adjust opacity, weight of outline for circle and color of outline for circle
+  
+  addCircleMarkers(data = acres,
+                   fillColor = ~pal_a(acres$ir_ir_tot),
+                   fillOpacity = 0.5,
+                   weight = 2,
+                   color = "green",
+                   
+                   
+                   
+                   # Adjust the radius of the circle – replace x with a value that helps show the circles in a way that communicates the data best
+                   radius = (acres$ir_ir_tot/700),
+                   
+                   # Indicate the group, which will be important for setting the interactive menu
+                   group = "Total Acres Irrigated") %>%
+  
+  
+  addCircleMarkers(data = acres,
+                   fillColor = ~pal_a(acres$ir_ir_sur),
+                   fillOpacity = 0.5,
+                   weight = 2,
+                   color = "green",
+                   radius = (acres$ir_ir_sur/700),
+                   group = "Acres Flood Irrigated") %>%
+  
+  addCircleMarkers(data = acres,
+                   fillColor = ~pal_a(acres$ir_ir_spr),
+                   fillOpacity = 0.5,
+                   weight = 2,
+                   color = "green",
+                   radius = (acres$ir_ir_spr/700),
+                   group = "Acres Sprinkler Irrigated") %>%
+  
+  addCircleMarkers(data = acres,
+                   fillColor = ~pal_a(acres$ir_ir_mic),
+                   fillOpacity = 0.5,
+                   weight = 2,
+                   color = "green",
+                   radius = (acres$ir_ir_mic/700),
+                   group = "Acres Micro Irrigated") %>%
+  
+  # Add a legend for withdrawals, indicate color palette, title and position
+  addLegend(pal = pal_w,
+            values = irrigation$Irrigation,
+            title = "Withdrawals (Mgal/d)",
+            position = "bottomright") %>%
+  
+  # Adjust controls for interactive menu; do not collapse the interactive menu
+  addLayersControl(options = layersControlOptions(collapsed = FALSE),
+                   
+                   # Add group names to interactive menu; these control the toggle buttons – watch for typos
+                   overlayGroups = c("Irrigation Withdrawals", "Total Acres Irrigated", "Acres Flood Irrigated", "Acres Sprinkler Irrigated", "Acres Micro Irrigated"),
+                   
+                   # Adjust the names of the base maps
+                   baseGroups = c("Imagery", "Base"))
+```
+
+
+**Define the three types of irrigation: flood, sprinkler, and micro irrigation**
+
+Flood irrigation is when crops are irrigated when water is spread across the surface applying water at
+the top part of the field so it can flow down the slope of the field.
+
+Sprinkler irrigation is when a sprinkler systems sprays water using a high-pressure system to provide water.
+
+Micro-irrigation is an irrigation system where small amount of water is applied to the surrounding area
+of the crop’s root zone. It can be through surface drip, which distributes water using low pressure at the
+surface above the crop’s root zone, or it can be through sub-surface drip, where water is applied to the
+root zone directly underground.
+
+**How do patterns of each type of irrigation change geo-spatially? How do patterns of acres under each type of irrigation correlate with total withdraws for irrigation?**
+
+For flood irrigation, it seems that is mostly used in states where water withdrawals are high, specially in western states, such as CA, TX, ID with the exception of MS. For sprinkler irrigation systems, states such as TX, NE, KS, ID, GA, WA, and OR are the biggest users. For micro-irrigation systems, California seems to be the biggest user. Geo-spatially, the pattern for irrigation systems seems to be that states located west of Mississippi, those with a big agricultural industry tend to use more flood and sprinkler irrigation.
+Whereas, micro irrigation is most common in California.
+
+Compared to total withdrawals for irrigation, acres under flood irrigation systems seem to be more common in states with high water withdrawals, those shaded in blue to deep-blue on the map. For sprinkler irrigation, it seems to be more common in states with medium to low-high water withdrawals, such as TX, ID, and NE. F

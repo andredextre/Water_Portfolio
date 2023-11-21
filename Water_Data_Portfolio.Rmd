@@ -2,12 +2,14 @@
 title: "Andre Dextre's Portfolio of Water Use"
 author: "Andre Dextre"
 date: "`r Sys.Date()`"
-output: pdf_document
+output:
+  pdf_document: default
+  latex_engine: xelatex
 ---
 
 ### Step 1: Load Libraries
 
-```{r setup, include=FALSE}
+```{r setup, message = FALSE, warning = FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 library(tidyverse)
 library(here)
@@ -23,7 +25,7 @@ library(ggnewscale)
 
 ### Step 2: Load Data
 
-```{r}
+```{r, message = FALSE, warning = FALSE}
 #Read 1950 data,skip rows, read sheets and join, clean names, turn to numeric,
 #and filter out NA
 d_wu_1950 <- lapply(excel_sheets(here("data/us1950.xlsx")),
@@ -138,7 +140,7 @@ d_wu_2015 <- read_xlsx(here("data/us2015.xlsx"), skip = 1) %>%
 
 ### Step 3: Organize Data by Sector and FIPS (Federal Information Standards)
 
-```{r}
+```{r, warning = FALSE, error = FALSE, message = FALSE}
 #Assign d_wu_year to wu_year
 #Create new columns (State, Public Supply, Irrigation, Rural, Industrial,
 #Thermoelectric, and Year)
@@ -341,7 +343,7 @@ wu_2015 <- d_wu_2015 %>%
 
 ### Step 4: Combine Data and Organize For Plotting
 
-```{r}
+```{r, message = FALSE, warning = FALSE}
 #Combine all 14 objects into wu_all
 #Remove unnecessary FIPS
 wu_all <- rbind(wu_1950, wu_1955, wu_1960, wu_1965, wu_1970, wu_1975, wu_1980, wu_1985,
@@ -410,7 +412,7 @@ ggplot() +
 
 ### Step 6: Organize Data For Plotting Timeseries of Sectoral Withdrawals
 
-```{r}
+```{r, message = FALSE, warning = FALSE}
 #1.The code follows best practices
 
 #2.I used the function read_tsv(), which automatically accounts for a tab delimited file.
@@ -492,7 +494,7 @@ The bar in the USGS plot show different patterns than my plot. The USGS’s plot
 
 ### Step 7: Organize Data For Plotting Timeseries of Sectoral Withdrawals for Colorado
 
-```{r}
+```{r, message = FALSE, warning = FALSE}
 #Create new object for sector water use for Colorado
 wu_co_sectors <- wu_all %>%
   replace(is.na(.), 0) %>%
@@ -565,7 +567,7 @@ ggplot() +
         axis.title.x = element_text(color = "black", size = 10),
         legend.position = "top",
         plot.caption = element_text(hjust = 0, face = "bold", size = 10))
-```
+``` 
 
 **Fresh Water Withdrawals by Sector in Colorado (1950-2015)**
 Total fresh water withdrawals in Colorado have generally increased from 1950 until 1970, with a decrease in water use in 1955. Additionally, there was a huge decrease in fresh water withdrawals in 1975, however a huge spike in fresh water withdrawal in 1980 followed. Despite the fresh water withdrawal spike in 1980, the following years (1985-2005) generally show a decrease in fresh water withdrawals, with some increases in 1995 and 2005. After 2005, there has been a big decrease in fresh water withdrawals, specially in irrigation, this is mostly due to conservation practices, water scarcity awareness, and drought conditions that plagued Colorado.
@@ -575,7 +577,7 @@ Both Colorado and the whole US, peaked in fresh water withdrawals in the 1980s. 
 
 ### Step 8: Organize Data For Plotting Timeseries of State Freshwater Use
 
-```{r}
+```{r, message = FALSE, warning = FALSE}
 fips <- d_wu_2015 %>%
   select(state, State = statefips) %>%
   unique() %>%
@@ -596,7 +598,7 @@ myplot <- function(data1, cap) {
     geom_line(data = data1,
               aes(x = Year, y = Withdrawals, color = state),
               size = 1) +
-    scale_color_manual(values = rep(c("darkblue", "royalblue4", "steelblue3",
+   scale_color_manual(values = rep(c("darkblue", "royalblue4", "steelblue3",
                                       "dodgerblue2", "skyblue"), 10)) +
     gghighlight(max(Withdrawals), max_highlight = 5L,
                 unhighlighted_params = list(size = .5, color = alpha("grey", 0.4)),
@@ -632,7 +634,7 @@ The most populous states such as California, Texas, New York, Florida, and Illin
 
 ### Step 9: Organized Data for Plotting Timeseries of GW and SW Withdrawals for USA
 
-```{r}
+```{r, message = FALSE, warning = FALSE}
 #Create new object for years 1965 to 2015
 #SW is ps, ir/it, do, ls/li, oi/in/mi/pt
 source_wu_1965 <- d_wu_1965 %>%
@@ -885,18 +887,20 @@ withdrawals. In 1985, total freshwater withdrawals started to decrease while pop
 
 ### Step 10: Organize for Plotting Timeseries of GW and SW Withdrawals for Colorado
 
-```{r}
+```{r, message = FALSE, warning = FALSE}
 wu_co_source <- wu_all_source %>%
   filter(State == 8)
 source_co <- wu_co_source %>%
   select(Source, Year, Withdrawals, State) %>%
   group_by(Year, Source) %>%
   summarize(across(Withdrawals, sum))
+
 population_co <- wu_co_source %>%
   filter(Source == "GW") %>%
   select(-Source, -Withdrawals) %>%
   group_by(Year) %>%
   summarize(across(Population, sum))
+
 ggplot() +
   geom_col(data = source_co, aes(x = Year, y = Withdrawals,
                                  fill = reorder(Source, Withdrawals)),

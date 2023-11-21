@@ -7,6 +7,8 @@ output:
   latex_engine: xelatex
 ---
 
+The data in this portfolio is available from the [United States Geological Survey](https://water.usgs.gov/watuse/data/index.html) for years 1950-2015.
+
 ### Step 1: Load Libraries
 
 ```{r setup, message = FALSE, warning = FALSE}
